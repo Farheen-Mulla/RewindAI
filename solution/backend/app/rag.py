@@ -3,7 +3,7 @@ import logging
 from groq import Groq
 
 from . import config
-from .vectorstore import query as vector_query
+from .retrieval import retrieve
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def _rewrite_query(question, history):
 
 
 def _relevant_hits(hits):
-    return [h for h in hits if h["distance"] <= config.MAX_DISTANCE]
+    return [h for h in hits if h.get("rerank_score", 0.0) >= config.MIN_RERANK_SCORE]
 
 
 def _citations_from_hits(hits):
@@ -82,7 +82,7 @@ def answer_stream(question, history=None):
     """
     history = history or []
     search_query = _rewrite_query(question, history)
-    hits = vector_query(search_query, top_k=config.TOP_K)
+    hits = retrieve(search_query, top_k=config.TOP_K)
     relevant = _relevant_hits(hits)
 
     if not relevant:

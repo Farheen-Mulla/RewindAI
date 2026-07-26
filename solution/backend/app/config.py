@@ -17,6 +17,15 @@ RETRIEVE_CANDIDATES = int(os.environ.get("RETRIEVE_CANDIDATES", "15"))
 RERANK_MODEL = os.environ.get("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 MMR_LAMBDA = float(os.environ.get("MMR_LAMBDA", "0.7"))
 
+# v2 guardrail threshold, replacing the raw vector MAX_DISTANCE cutoff above. Cross-encoder
+# scores are NOT 0-centered in practice — on a small test corpus, genuinely relevant top
+# hits scored anywhere from -0.7 to -8, while irrelevant questions clustered near -11. This
+# default is deliberately permissive (biased toward answering, since the system prompt's
+# "say you don't know" instruction is the real backstop against hallucination). Don't guess
+# a tighter number — run `python -m app.evaluate` against your own playlist, which reports
+# the actual score gap between hits and misses and suggests a calibrated value.
+MIN_RERANK_SCORE = float(os.environ.get("MIN_RERANK_SCORE", "-8.0"))
+
 # Chroma uses L2 distance over MiniLM's normalized embeddings (~0-2 range).
 # Retrieved chunks above this are treated as "not actually relevant" for the guardrail.
 # Tune against your own playlist if the guardrail fires too often or not enough.
