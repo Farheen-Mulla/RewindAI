@@ -33,14 +33,15 @@ def fetch_transcript(video_id):
         return None
 
 
-def build_transcripts_json(playlist_url, output_path, window_seconds):
+def build_transcripts_json(playlist_url, output_path, window_seconds, overlap_seconds=None):
     """Fetch every video in the playlist, chunk its transcript, write transcripts.json.
 
     TODO:
     1. Call get_playlist_videos(playlist_url) to get [{"video_id", "title"}, ...].
     2. For each video: call fetch_transcript(video_id). If it returns None (no
        captions — see the edge case handled above), skip it and keep going, don't crash.
-    3. Otherwise, call chunk_transcript(entries, window_seconds=window_seconds) and turn
+    3. Otherwise, call chunk_transcript(entries, window_seconds=window_seconds,
+       overlap_seconds=overlap_seconds or config.CHUNK_OVERLAP_SECONDS) and turn
        each chunk into a record:
            {
                "video_id": video_id,
@@ -61,8 +62,9 @@ def main():
     parser.add_argument("--playlist", required=True, help="YouTube playlist URL")
     parser.add_argument("--output", default=str(config.TRANSCRIPTS_PATH))
     parser.add_argument("--window-seconds", type=int, default=config.CHUNK_WINDOW_SECONDS)
+    parser.add_argument("--overlap-seconds", type=int, default=config.CHUNK_OVERLAP_SECONDS)
     args = parser.parse_args()
-    build_transcripts_json(args.playlist, args.output, args.window_seconds)
+    build_transcripts_json(args.playlist, args.output, args.window_seconds, args.overlap_seconds)
 
 
 if __name__ == "__main__":

@@ -33,10 +33,11 @@ def fetch_transcript(video_id):
         return None
 
 
-def build_transcripts_json(playlist_url, output_path, window_seconds):
+def build_transcripts_json(playlist_url, output_path, window_seconds, overlap_seconds=None):
     videos = get_playlist_videos(playlist_url)
     logger.info("Found %d videos in playlist", len(videos))
 
+    overlap_seconds = config.CHUNK_OVERLAP_SECONDS if overlap_seconds is None else overlap_seconds
     all_chunks = []
     indexed_count = 0
     skipped_count = 0
@@ -49,7 +50,7 @@ def build_transcripts_json(playlist_url, output_path, window_seconds):
             skipped_count += 1
             continue
 
-        chunks = chunk_transcript(entries, window_seconds=window_seconds)
+        chunks = chunk_transcript(entries, window_seconds=window_seconds, overlap_seconds=overlap_seconds)
         for chunk in chunks:
             all_chunks.append(
                 {
@@ -80,8 +81,9 @@ def main():
     parser.add_argument("--playlist", required=True, help="YouTube playlist URL")
     parser.add_argument("--output", default=str(config.TRANSCRIPTS_PATH))
     parser.add_argument("--window-seconds", type=int, default=config.CHUNK_WINDOW_SECONDS)
+    parser.add_argument("--overlap-seconds", type=int, default=config.CHUNK_OVERLAP_SECONDS)
     args = parser.parse_args()
-    build_transcripts_json(args.playlist, args.output, args.window_seconds)
+    build_transcripts_json(args.playlist, args.output, args.window_seconds, args.overlap_seconds)
 
 
 if __name__ == "__main__":
