@@ -34,3 +34,6 @@ node_modules/
 
 # Logs
 *.log
+
+# Working notes — see architecture.md at root for the diagram
+docs/
