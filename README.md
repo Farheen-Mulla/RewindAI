@@ -43,3 +43,10 @@ Open `solution/frontend/index.html` (served by the backend at `/`) and start ask
 ## Deploying
 
 See `solution/render.yaml` and `docs/architecture/` for the deploy walkthrough.
+
+## Stretch goals
+
+`solution/` runs a sharper retrieval pipeline than what `starter/` teaches in the core
+build — hybrid vector+keyword search, cross-encoder reranking, diversity filtering, and an
+evaluation harness for measuring retrieval quality on your own playlist. Not part of the
+required Day 2 path; see `docs/architecture/v2-retrieval.md`.

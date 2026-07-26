@@ -68,6 +68,9 @@ troubleshooting — don't plan new content into it.
      tells the model to say so when context is insufficient.
 - Why both layers: the threshold catches "nothing relevant was retrieved," the prompt
   catches "something was retrieved but doesn't actually answer this."
+- One-sentence pointer, not a detour: `solution/` actually runs a sharper version of this
+  (hybrid search + reranking + a calibrated threshold instead of a guessed one) — that's
+  `docs/architecture/v2-retrieval.md`, stretch/buffer-hour content, not core material.
 
 ## 7. This project's architecture, walked end to end (35 min)
 
