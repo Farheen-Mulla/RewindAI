@@ -1,15 +1,19 @@
 # data/
 
 `transcripts.json` lives here once you run ingestion — it's the pre-processed, chunked, timestamped
-transcript output that gets committed to the repo and is what a fresh deploy rebuilds its Chroma
-index from on startup (see root README, "Why transcripts are rebuilt on startup").
+transcript output the app rebuilds its Chroma index from on startup (see root README, "Why
+transcripts are rebuilt on startup"). It is **not committed** — it's playlist-specific and generated
+locally. Without it the index is empty and the app answers nothing.
 
-Generate it with:
+Generate it (or just run `./setup.sh` from the repo root, which does this for you):
 
 ```bash
 cd solution/backend
 python -m app.ingest --playlist "<youtube playlist URL>"
 ```
+
+To deploy on Render, commit the generated `transcripts.json` so the container has data to rebuild
+from on startup.
 
 It contains chunked lecture text + timestamps + video IDs — no embeddings, no secrets — so it's
 safe to commit.
