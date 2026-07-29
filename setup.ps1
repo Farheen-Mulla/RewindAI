@@ -48,11 +48,16 @@ $env:Path = "$env:USERPROFILE\.local\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
 if (Get-Command uv -ErrorAction SilentlyContinue) {
   Log "uv found: $(uv --version)"
 } else {
-  Log "Installing uv (https://astral.sh/uv)"
+  Log "uv not installed — installing (https://astral.sh/uv)"
   powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
   $env:Path = "$env:USERPROFILE\.local\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Die "uv installed but not on PATH. Open a new PowerShell window and re-run."
+    # last resort: installer chose a non-standard dir — locate uv.exe under the profile
+    $found = Get-ChildItem -Path $env:USERPROFILE -Filter uv.exe -Recurse -ErrorAction SilentlyContinue -Depth 4 | Select-Object -First 1
+    if ($found) { $env:Path = "$($found.DirectoryName);$env:Path" }
+  }
+  if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Die "uv installed but not found on PATH. Open a new PowerShell window and re-run."
   }
   Log "uv installed: $(uv --version)"
 }

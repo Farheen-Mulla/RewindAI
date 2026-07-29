@@ -58,14 +58,18 @@ log "Environment: $OS/$ARCH"
 [ -d "$BACKEND_DIR" ] || die "solution/backend not found next to setup.sh."
 
 # --- 1. ensure uv ---
+# pull every place uv might have landed into this session's PATH
+_uv_onpath() {
+  [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env" 2>/dev/null || true
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:${XDG_BIN_HOME:-$HOME/.local/bin}:$PATH"
+}
 ensure_uv() {
-  # add likely install locations to PATH for this session
-  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  _uv_onpath
   if command -v uv >/dev/null 2>&1; then
     log "uv found: $(uv --version)"
     return
   fi
-  log "Installing uv (https://astral.sh/uv)"
+  log "uv not installed — installing (https://astral.sh/uv)"
   if command -v curl >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
   elif command -v wget >/dev/null 2>&1; then
@@ -73,8 +77,13 @@ ensure_uv() {
   else
     die "Need curl or wget to install uv. Install one, or install uv manually: https://astral.sh/uv"
   fi
-  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-  command -v uv >/dev/null 2>&1 || die "uv installed but not on PATH. Open a new terminal and re-run, or add ~/.local/bin to PATH."
+  _uv_onpath
+  # last resort: the installer chose a non-standard dir — locate the binary under HOME
+  if ! command -v uv >/dev/null 2>&1; then
+    UV_BIN="$(find "$HOME" -maxdepth 4 -type f -name uv 2>/dev/null | head -1)"
+    [ -n "$UV_BIN" ] && export PATH="$(dirname "$UV_BIN"):$PATH"
+  fi
+  command -v uv >/dev/null 2>&1 || die "uv installed but not found on PATH. Open a new terminal and re-run, or add ~/.local/bin to PATH."
   log "uv installed: $(uv --version)"
 }
 ensure_uv
