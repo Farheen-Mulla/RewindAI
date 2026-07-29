@@ -28,16 +28,22 @@ Render's free tier disk is ephemeral — wiped on every restart/redeploy. Instea
 
 ## Quickstart (solution/)
 
-One command — creates the venv, installs deps, sets up `.env`, ingests a playlist into
-`data/transcripts.json`, and starts the server:
+One command on a fresh machine — no Python needed. The script installs [`uv`](https://astral.sh/uv)
+if missing, uv fetches Python 3.11, then it creates the venv, installs deps, sets up `.env`, ingests
+a playlist into `data/transcripts.json`, and starts the server:
 
 ```bash
+# macOS / Linux
 ./setup.sh "<youtube playlist URL>"
+
+# Windows (PowerShell)
+.\setup.ps1 "<youtube playlist URL>"
 ```
 
-It prompts for a playlist URL and your `GROQ_API_KEY` if you don't pass them. The app ships with
-**no** `transcripts.json` — that file is generated per-playlist by ingest, so without this step the
-index is empty and every answer is "I don't know."
+It prompts for a playlist URL and your `GROQ_API_KEY` if you don't pass them. Flags: `--no-serve`,
+`--force-ingest` (PowerShell: `-NoServe`, `-ForceIngest`). The app ships with **no** `transcripts.json`
+— that file is generated per-playlist by ingest, so without this step the index is empty and every
+answer is "I don't know."
 
 Manual equivalent:
 
