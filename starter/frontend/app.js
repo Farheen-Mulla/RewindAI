@@ -54,20 +54,42 @@ function renderCitations(container, citations) {
 
 // Parses "event: X\ndata: Y\n\n" frames off an SSE stream sent via fetch (not EventSource,
 // since EventSource can't send a POST body — we need one to pass question + history).
-//
-// TODO:
-// 1. fetch("/api/chat", { method: "POST", headers: {"Content-Type": "application/json"},
-//    body: JSON.stringify({ question, history }) }).
-// 2. If !response.ok || !response.body, throw an Error.
-// 3. Get a reader via response.body.getReader() and a TextDecoder.
-// 4. Loop: read a chunk, decode it into a running `buffer` string.
-// 5. While the buffer contains a "\n\n" boundary, slice out one complete frame, parse its
-//    "event: X" and "data: Y" lines (Y is JSON), and:
-//    - if event === "citations", call onCitations(data.citations)
-//    - if event === "token", call onToken(data.text)
-// 6. Stop when the reader reports `done`.
 async function streamChat(question, onCitations, onToken) {
-  throw new Error("TODO: implement streamChat (SSE-over-fetch parsing)");
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, history }),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundary;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+
+      const eventLine = frame.split("\n").find((l) => l.startsWith("event: "));
+      const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+      if (!eventLine || !dataLine) continue;
+
+      const event = eventLine.slice("event: ".length);
+      const data = JSON.parse(dataLine.slice("data: ".length));
+
+      if (event === "citations") onCitations(data.citations);
+      else if (event === "token") onToken(data.text);
+    }
+  }
 }
 
 formEl.addEventListener("submit", async (e) => {
@@ -83,13 +105,27 @@ formEl.addEventListener("submit", async (e) => {
   let answerText = "";
   let citationsContainer = null;
 
-  // TODO: call streamChat(question, onCitations, onToken):
-  //   - onCitations(citations): create a container element after assistantBubble and
-  //     call renderCitations(citationsContainer, citations) into it.
-  //   - onToken(token): append the token to `answerText` and set
-  //     assistantBubble.textContent = answerText (keep scrolling messagesEl to bottom).
-  // On success, push {role: "user", content: question} and
-  // {role: "assistant", content: answerText} onto `history` so follow-up questions have
-  // context. On failure, add the "error" class to assistantBubble and show the message.
-  // Always re-enable inputEl and refocus it when done (try/finally).
+  try {
+    await streamChat(
+      question,
+      (citations) => {
+        citationsContainer = document.createElement("div");
+        assistantBubble.after(citationsContainer);
+        renderCitations(citationsContainer, citations);
+      },
+      (token) => {
+        answerText += token;
+        assistantBubble.textContent = answerText;
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    );
+    history.push({ role: "user", content: question });
+    history.push({ role: "assistant", content: answerText });
+  } catch (err) {
+    assistantBubble.classList.add("error");
+    assistantBubble.textContent = `Something went wrong: ${err.message}`;
+  } finally {
+    inputEl.disabled = false;
+    inputEl.focus();
+  }
 });
