@@ -4,14 +4,15 @@ import logging
 from pathlib import Path
 
 import yt_dlp
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled
+from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
 
 from . import config
 from .chunking import chunk_transcript
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+_yt_api = YouTubeTranscriptApi()
 
 
 def get_playlist_videos(playlist_url):
@@ -23,8 +24,10 @@ def get_playlist_videos(playlist_url):
 
 
 def fetch_transcript(video_id):
+    # youtube-transcript-api 1.x: instance .fetch() returns a FetchedTranscript;
+    # .to_raw_data() gives the [{text, start, duration}] dicts chunking expects.
     try:
-        return YouTubeTranscriptApi.get_transcript(video_id)
+        return _yt_api.fetch(video_id).to_raw_data()
     except (TranscriptsDisabled, NoTranscriptFound):
         logger.warning("No captions for video %s — skipping", video_id)
         return None

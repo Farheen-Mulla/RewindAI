@@ -9,6 +9,12 @@ from . import config
 
 logger = logging.getLogger(__name__)
 
+# This chromadb pins a posthog whose capture() signature mismatches, so it logs a
+# spammy ERROR on every operation ("capture() takes 1 positional argument..."). The
+# anonymized_telemetry setting doesn't stop the failing send in this version, so mute
+# the telemetry logger directly — it's harmless noise, not an app error.
+logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
+
 _client = None
 _collection = None
 
