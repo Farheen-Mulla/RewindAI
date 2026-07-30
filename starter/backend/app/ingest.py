@@ -1,7 +1,6 @@
 import argparse
 import json
 import logging
-import tempfile
 from pathlib import Path
 
 import yt_dlp
@@ -33,41 +32,56 @@ _yt_api = _make_yt_api()
 
 
 def get_playlist_videos(playlist_url):
+    # Accepts a playlist URL or a single-video URL. yt-dlp returns "entries" for a playlist;
+    # for one video there's no "entries", so treat the info dict itself as the single entry.
     ydl_opts = {"extract_flat": True, "quiet": True, "skip_download": True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(playlist_url, download=False)
-    entries = info.get("entries", []) if info else []
+    if not info:
+        return []
+    entries = info.get("entries")
+    if entries is None:
+        entries = [info]
     return [{"video_id": e["id"], "title": e.get("title") or e["id"]} for e in entries if e.get("id")]
+
+
+def _pick_json3_url(tracks):
+    """From a yt-dlp subtitles/automatic_captions dict, return the English json3 caption URL."""
+    for lang in ("en", "en-US", "en-GB", "en-orig"):
+        for fmt in tracks.get(lang, []):
+            if fmt.get("ext") == "json3":
+                return fmt.get("url")
+    return None
 
 
 def _fetch_transcript_ytdlp(video_id):
     """Fallback transcript fetch via yt-dlp. More block-resistant than youtube-transcript-api
-    (it emulates YouTube clients) and can use browser cookies. Downloads json3 captions and
-    returns the same [{text, start, duration}] shape chunking expects, or None if there are none.
+    (it emulates YouTube clients and can use browser cookies). Resolves the video's caption
+    tracks, then fetches the English json3 track directly — returns the same
+    [{text, start, duration}] shape chunking expects, or None if there are no captions.
     """
     url = f"https://www.youtube.com/watch?v={video_id}"
-    with tempfile.TemporaryDirectory() as tmp:
-        ydl_opts = {
-            "skip_download": True,
-            "writesubtitles": True,        # manual captions if present...
-            "writeautomaticsub": True,     # ...else auto-generated
-            "subtitleslangs": ["en", "en-US", "en-GB", "en-orig"],
-            "subtitlesformat": "json3",
-            "outtmpl": str(Path(tmp) / "%(id)s.%(ext)s"),
-            "quiet": True,
-            "no_warnings": True,
-        }
-        if config.YTDLP_COOKIES_FROM_BROWSER:
-            ydl_opts["cookiesfrombrowser"] = (config.YTDLP_COOKIES_FROM_BROWSER,)
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+    ydl_opts = {
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        # We only want captions; don't abort when no downloadable video format is offered
+        # (that path raises "Requested format is not available").
+        "ignore_no_formats_error": True,
+    }
+    if config.YTDLP_COOKIES_FROM_BROWSER:
+        ydl_opts["cookiesfrombrowser"] = (config.YTDLP_COOKIES_FROM_BROWSER,)
 
-        files = sorted(Path(tmp).glob("*.json3"))
-        if not files:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        sub_url = _pick_json3_url(info.get("subtitles") or {}) or _pick_json3_url(
+            info.get("automatic_captions") or {}
+        )
+        if not sub_url:
             return None
-        data = json.loads(files[0].read_text())
+        raw = ydl.urlopen(sub_url).read().decode("utf-8", "replace")
 
-    return _parse_json3(data) or None
+    return _parse_json3(json.loads(raw)) or None
 
 
 def _parse_json3(data):
