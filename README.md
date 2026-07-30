@@ -28,22 +28,37 @@ Render's free tier disk is ephemeral — wiped on every restart/redeploy. Instea
 
 ## Quickstart (solution/)
 
-One command on a fresh machine — no Python needed. The script installs [`uv`](https://astral.sh/uv)
-if missing, uv fetches Python 3.11, then it creates the venv, installs deps, sets up `.env`, ingests
-a playlist into `data/transcripts.json`, and starts the server:
+The repo **ships with a ready-made `data/transcripts.json`** (a 3Blue1Brown "Essence of calculus"
+playlist), so it runs out of the box — no YouTube ingest needed. One command on a fresh machine,
+no Python required. The script installs [`uv`](https://astral.sh/uv) if missing, uv fetches
+Python 3.11, then it creates the venv, installs deps, sets up `.env`, and starts the server:
 
 ```bash
 # macOS / Linux
-./setup.sh "<youtube playlist URL>"
+./setup.sh
 
 # Windows (PowerShell)
-.\setup.ps1 "<youtube playlist URL>"
+.\setup.ps1
 ```
 
-It prompts for a playlist URL and your `GROQ_API_KEY` if you don't pass them. Flags: `--no-serve`,
-`--force-ingest` (PowerShell: `-NoServe`, `-ForceIngest`). The app ships with **no** `transcripts.json`
-— that file is generated per-playlist by ingest, so without this step the index is empty and every
-answer is "I don't know."
+It prompts only for your `GROQ_API_KEY`. Open the served page and ask about calculus.
+
+**To use your own playlist instead**, pass a URL — that re-ingests and overwrites
+`transcripts.json`:
+
+```bash
+./setup.sh "<youtube playlist URL>"          # PowerShell: .\setup.ps1 "<url>"
+```
+
+> **YouTube may IP-block ingest.** Transcript fetching happens only at ingest time (offline,
+> one-time) — the deployed app never calls YouTube. If ingest fails with an `IpBlocked` error,
+> you're on a blocked IP: cloud IPs are blanket-blocked, and a home IP can get rate-limited after
+> many requests. Fixes, simplest first: run ingest from a **residential IP** (home wifi, or a
+> phone hotspot — a different IP often clears it), or set `WEBSHARE_PROXY_USERNAME` /
+> `WEBSHARE_PROXY_PASSWORD` in `.env` to route through a residential proxy. You only need one
+> successful ingest — commit the resulting `transcripts.json`.
+
+Flags: `--no-serve`, `--force-ingest` (PowerShell: `-NoServe`, `-ForceIngest`).
 
 Manual equivalent:
 
@@ -52,7 +67,8 @@ cd solution/backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # fill in GROQ_API_KEY
-python -m app.ingest --playlist "<youtube playlist URL>"   # builds data/transcripts.json
+# transcripts.json already ships; to use your own playlist:
+# python -m app.ingest --playlist "<youtube playlist URL>"
 uvicorn app.main:app --reload
 ```
 

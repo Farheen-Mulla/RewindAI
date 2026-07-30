@@ -1,28 +1,27 @@
 # data/
 
-`transcripts.json` lives here once you run ingestion — it's the pre-processed, chunked, timestamped
-transcript output the app rebuilds its Chroma index from on startup (see root README, "Why
-transcripts are rebuilt on startup"). It is **not committed** — it's playlist-specific and generated
-locally. Without it the index is empty and the app answers nothing.
+`transcripts.json` is the pre-processed, chunked, timestamped transcript output the app rebuilds
+its Chroma index from on startup (see root README, "Why transcripts are rebuilt on startup"). A
+ready-made demo set (3Blue1Brown "Essence of calculus") **ships here already**, so the app runs
+out of the box and deploys with data.
 
-Generate it (or just run `./setup.sh` from the repo root, which does this for you):
+To use your own playlist, regenerate it (overwrites the demo). Run this once from a **residential
+IP** — YouTube IP-blocks cloud IPs and rate-limits over-eager home IPs — then commit the result:
 
 ```bash
 cd solution/backend
 python -m app.ingest --playlist "<youtube playlist URL>"
+# IpBlocked error? try a phone hotspot, or set WEBSHARE_PROXY_* in .env (see .env.example)
 ```
-
-To deploy on Render, commit the generated `transcripts.json` so the container has data to rebuild
-from on startup.
 
 It contains chunked lecture text + timestamps + video IDs — no embeddings, no secrets — so it's
 safe to commit.
 
 ## eval_questions.json
 
-Copy `eval_questions.example.json` to `eval_questions.json` and hand-label 5-10 real
-question/expected-video pairs from your own playlist (see the format notes in the example
-file). Then run:
+A demo `eval_questions.json` (matching the shipped 3Blue1Brown transcripts) is included, so the
+harness runs immediately. For your own playlist, replace it with 5-10 hand-labeled
+question/expected-video pairs (see `eval_questions.example.json` for the format). Then run:
 
 ```bash
 python -m app.evaluate --pipeline hybrid       # what the deployed app actually runs
