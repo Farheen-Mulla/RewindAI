@@ -43,23 +43,23 @@ Python 3.11, then it creates the venv, installs deps, sets up `.env`, and starts
 
 It prompts only for your `GROQ_API_KEY`. Open the served page and ask about calculus.
 
-**To use your own playlist instead**, pass a URL — that re-ingests and overwrites
-`transcripts.json`:
+**To use your own content instead**, pass a URL — a **single video or a whole playlist** — which
+re-ingests and overwrites `transcripts.json`:
 
 ```bash
-./setup.sh "<youtube playlist URL>"          # PowerShell: .\setup.ps1 "<url>"
+./setup.sh "https://www.youtube.com/watch?v=VIDEO_ID"        # one video
+./setup.sh "https://www.youtube.com/playlist?list=..."       # a playlist
+# PowerShell: .\setup.ps1 "<url>"
 ```
 
+See **[INGEST.md](INGEST.md)** for the full guide — single video vs playlist, and the exact
+steps to get past a YouTube IP-block (hotspot → browser cookies → proxy).
+
 > **YouTube may IP-block ingest.** Transcript fetching happens only at ingest time (offline,
-> one-time) — the deployed app never calls YouTube. If ingest fails with an `IpBlocked` error,
-> you're on a blocked IP: cloud IPs are blanket-blocked, and a home IP can get rate-limited after
-> many requests. Ingest already **falls back to yt-dlp automatically** when the primary fetch is
-> blocked. Further fixes, simplest first: run from a **residential IP** (home wifi, or a phone
-> hotspot — a different IP often clears it); set `YTDLP_COOKIES_FROM_BROWSER=chrome` in `.env` so
-> the yt-dlp fallback uses your logged-in cookies (best free lever on a soft-blocked home IP); or,
-> last resort for a hard block, set `WEBSHARE_PROXY_USERNAME` / `WEBSHARE_PROXY_PASSWORD` to route
-> through a residential proxy. You only need one successful ingest — commit the resulting
-> `transcripts.json`.
+> one-time) — the deployed app never calls YouTube, so this never affects the running app. If you
+> hit `IpBlocked` / `HTTP 429`, you're on a throttled IP; the fix ladder (hotspot → browser
+> cookies → proxy) is in **[INGEST.md](INGEST.md)**. You only need one successful ingest — commit
+> the resulting `transcripts.json`.
 
 Flags: `--no-serve`, `--force-ingest` (PowerShell: `-NoServe`, `-ForceIngest`).
 
