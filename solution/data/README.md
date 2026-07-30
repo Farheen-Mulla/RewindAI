@@ -11,7 +11,8 @@ IP** — YouTube IP-blocks cloud IPs and rate-limits over-eager home IPs — the
 ```bash
 cd solution/backend
 python -m app.ingest --playlist "<youtube playlist URL>"
-# IpBlocked error? try a phone hotspot, or set WEBSHARE_PROXY_* in .env (see .env.example)
+# IpBlocked? ingest auto-falls back to yt-dlp. Also try a phone hotspot, or set
+# YTDLP_COOKIES_FROM_BROWSER / WEBSHARE_PROXY_* in .env (see .env.example)
 ```
 
 It contains chunked lecture text + timestamps + video IDs — no embeddings, no secrets — so it's

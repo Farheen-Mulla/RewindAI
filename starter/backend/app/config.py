@@ -30,6 +30,12 @@ MAX_DISTANCE = float(os.environ.get("MAX_DISTANCE", "1.2"))
 WEBSHARE_PROXY_USERNAME = os.environ.get("WEBSHARE_PROXY_USERNAME", "")
 WEBSHARE_PROXY_PASSWORD = os.environ.get("WEBSHARE_PROXY_PASSWORD", "")
 
+# Ingest fallback: when youtube-transcript-api is blocked, ingest retries via yt-dlp, which
+# emulates YouTube clients and can read your browser's cookies — often clears a soft-blocked
+# home IP. Set to a browser name (chrome | firefox | edge | safari | brave) to use its cookies;
+# leave blank to run the yt-dlp fallback without cookies.
+YTDLP_COOKIES_FROM_BROWSER = os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "")
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 STARTER_DIR = BACKEND_DIR.parent
 DATA_DIR = STARTER_DIR / "data"

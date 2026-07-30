@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import tempfile
 from pathlib import Path
 
 import yt_dlp
@@ -39,17 +40,75 @@ def get_playlist_videos(playlist_url):
     return [{"video_id": e["id"], "title": e.get("title") or e["id"]} for e in entries if e.get("id")]
 
 
+def _fetch_transcript_ytdlp(video_id):
+    """Fallback transcript fetch via yt-dlp. More block-resistant than youtube-transcript-api
+    (it emulates YouTube clients) and can use browser cookies. Downloads json3 captions and
+    returns the same [{text, start, duration}] shape chunking expects, or None if there are none.
+    """
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    with tempfile.TemporaryDirectory() as tmp:
+        ydl_opts = {
+            "skip_download": True,
+            "writesubtitles": True,        # manual captions if present...
+            "writeautomaticsub": True,     # ...else auto-generated
+            "subtitleslangs": ["en", "en-US", "en-GB", "en-orig"],
+            "subtitlesformat": "json3",
+            "outtmpl": str(Path(tmp) / "%(id)s.%(ext)s"),
+            "quiet": True,
+            "no_warnings": True,
+        }
+        if config.YTDLP_COOKIES_FROM_BROWSER:
+            ydl_opts["cookiesfrombrowser"] = (config.YTDLP_COOKIES_FROM_BROWSER,)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        files = sorted(Path(tmp).glob("*.json3"))
+        if not files:
+            return None
+        data = json.loads(files[0].read_text())
+
+    return _parse_json3(data) or None
+
+
+def _parse_json3(data):
+    """Turn YouTube's json3 caption payload into [{text, start, duration}] (seconds)."""
+    entries = []
+    for event in data.get("events", []):
+        segs = event.get("segs") or []
+        text = "".join(s.get("utf8", "") for s in segs).strip()
+        if not text:
+            continue
+        entries.append(
+            {
+                "text": text,
+                "start": event.get("tStartMs", 0) / 1000.0,
+                "duration": event.get("dDurationMs", 0) / 1000.0,
+            }
+        )
+    return entries
+
+
 def fetch_transcript(video_id):
-    # youtube-transcript-api 1.x: instance .fetch() returns a FetchedTranscript;
-    # .to_raw_data() gives the [{text, start, duration}] dicts chunking expects.
+    # Primary: youtube-transcript-api 1.x (.fetch().to_raw_data() -> [{text, start, duration}]).
+    # On a block/error, fall back to yt-dlp — it emulates YouTube clients and can use browser
+    # cookies (set YTDLP_COOKIES_FROM_BROWSER), which often clears a soft-blocked home IP.
     try:
         return _yt_api.fetch(video_id).to_raw_data()
     except (TranscriptsDisabled, NoTranscriptFound):
         logger.warning("No captions for video %s — skipping", video_id)
         return None
     except Exception as exc:
-        logger.warning("Failed to fetch transcript for %s: %s — skipping", video_id, exc)
-        return None
+        logger.warning("youtube-transcript-api failed for %s (%s) — trying yt-dlp fallback", video_id, exc)
+
+    try:
+        entries = _fetch_transcript_ytdlp(video_id)
+        if entries:
+            logger.info("Fetched transcript for %s via yt-dlp fallback", video_id)
+            return entries
+        logger.warning("yt-dlp fallback found no captions for %s — skipping", video_id)
+    except Exception as exc:
+        logger.warning("yt-dlp fallback failed for %s: %s — skipping", video_id, exc)
+    return None
 
 
 def build_transcripts_json(playlist_url, output_path, window_seconds, overlap_seconds=None):
