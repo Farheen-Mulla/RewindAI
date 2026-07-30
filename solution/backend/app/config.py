@@ -31,6 +31,13 @@ MIN_RERANK_SCORE = float(os.environ.get("MIN_RERANK_SCORE", "-8.0"))
 # Tune against your own playlist if the guardrail fires too often or not enough.
 MAX_DISTANCE = float(os.environ.get("MAX_DISTANCE", "1.2"))
 
+# Ingest-only escape hatch: if YouTube IP-blocks transcript fetching (common on cloud IPs,
+# or a home IP rate-limited after many requests), set these to route requests through a
+# Webshare residential proxy (https://www.webshare.io — pick "Residential"). Left blank,
+# ingest fetches directly. Not needed at runtime — the deployed app never calls YouTube.
+WEBSHARE_PROXY_USERNAME = os.environ.get("WEBSHARE_PROXY_USERNAME", "")
+WEBSHARE_PROXY_PASSWORD = os.environ.get("WEBSHARE_PROXY_PASSWORD", "")
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 SOLUTION_DIR = BACKEND_DIR.parent
 DATA_DIR = SOLUTION_DIR / "data"

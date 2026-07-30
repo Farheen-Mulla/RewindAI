@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yt_dlp
 from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled, YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
 from . import config
 from .chunking import chunk_transcript
@@ -12,7 +13,22 @@ from .chunking import chunk_transcript
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-_yt_api = YouTubeTranscriptApi()
+
+def _make_yt_api():
+    # If Webshare proxy creds are set, route transcript fetches through them — the escape
+    # hatch for when YouTube IP-blocks you. Otherwise fetch directly.
+    if config.WEBSHARE_PROXY_USERNAME and config.WEBSHARE_PROXY_PASSWORD:
+        logger.info("Fetching transcripts through Webshare proxy")
+        return YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=config.WEBSHARE_PROXY_USERNAME,
+                proxy_password=config.WEBSHARE_PROXY_PASSWORD,
+            )
+        )
+    return YouTubeTranscriptApi()
+
+
+_yt_api = _make_yt_api()
 
 
 def get_playlist_videos(playlist_url):
