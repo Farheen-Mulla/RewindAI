@@ -66,47 +66,53 @@ def _empty_stream():
 
 
 def _rewrite_query(question, history):
-    """Fold recent chat history into the retrieval query for follow-up questions.
-
-    TODO: if `history` is empty, just return `question` unchanged. Otherwise, take the
-    last few turns (e.g. history[-4:]) and prepend them to the question as plain text
-    ("role: content" per line) so a vague follow-up like "what about the second one?"
-    still retrieves the right chunks.
-    """
-    raise NotImplementedError("TODO: implement _rewrite_query")
+    if not history:
+        return question
+    recent = history[-4:]
+    convo = "\n".join(f"{turn['role']}: {turn['content']}" for turn in recent)
+    return f"{convo}\nuser: {question}"
 
 
 def _relevant_hits(hits):
-    """Filter retrieved hits down to ones actually worth answering from.
-
-    TODO: keep only hits whose "distance" is <= config.MAX_DISTANCE. This is the
-    guardrail against hallucination — if nothing retrieved is close enough, the caller
-    should fall back to "I couldn't find that in these lectures" instead of asking the
-    model to answer from irrelevant context.
-    """
-    raise NotImplementedError("TODO: implement _relevant_hits")
+    return [h for h in hits if h.get("distance", 999.0) <= config.MAX_DISTANCE]
 
 
 def answer_stream(question, history=None):
     """Retrieve relevant chunks and return (token_generator, citations) for the question.
 
-    TODO:
-    1. Build a search query via _rewrite_query(question, history or []).
-    2. Retrieve hits via vector_query(search_query, top_k=config.TOP_K).
-    3. Filter to relevant = _relevant_hits(hits). If empty, return (_empty_stream(), []) —
-       this is the "not covered in these lectures" guardrail path.
-    4. Otherwise build citations = _citations_from_hits(relevant) and context =
-       _format_context(relevant).
-    5. Build the messages list: a system message (SYSTEM_PROMPT + the context), then
-       the last few turns of `history`, then the current user question.
-    6. Return a generator that streams tokens from Groq (client.chat.completions.create
-       with stream=True, yielding chunk.choices[0].delta.content for each chunk that has
-       one) alongside `citations`.
-
-    Handle two failure modes inside the token generator:
-    - GeneratorExit (client disconnected mid-stream): re-raise it, don't swallow it —
-      that's what lets the Groq connection actually close instead of hanging.
-    - Any other exception (Groq API error, rate limit, etc): log it and yield a visible
-      "[Error: ...]" message instead of letting the whole request 500 silently.
+    Returns immediately with citations (retrieval already happened) so the caller
+    can send them ahead of the token stream.
     """
-    raise NotImplementedError("TODO: implement answer_stream")
+    history = history or []
+    search_query = _rewrite_query(question, history)
+    hits = vector_query(search_query, top_k=config.TOP_K)
+    relevant = _relevant_hits(hits)
+
+    if not relevant:
+        return _empty_stream(), []
+
+    citations = _citations_from_hits(relevant)
+    context = _format_context(relevant)
+
+    messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\nContext:\n" + context}]
+    for turn in history[-6:]:
+        messages.append({"role": turn["role"], "content": turn["content"]})
+    messages.append({"role": "user", "content": question})
+
+    client = _get_client()
+
+    def token_gen():
+        try:
+            stream = client.chat.completions.create(model=config.GROQ_MODEL, messages=messages, stream=True)
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except GeneratorExit:
+            # Client disconnected mid-stream — let Groq's connection close, don't retry/swallow.
+            raise
+        except Exception as exc:
+            logger.exception("Groq streaming failed")
+            yield f"\n\n[Error: could not reach the model — {exc}]"
+
+    return token_gen(), citations

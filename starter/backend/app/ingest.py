@@ -126,27 +126,46 @@ def fetch_transcript(video_id):
 
 
 def build_transcripts_json(playlist_url, output_path, window_seconds, overlap_seconds=None):
-    """Fetch every video in the playlist, chunk its transcript, write transcripts.json.
+    videos = get_playlist_videos(playlist_url)
+    logger.info("Found %d videos in playlist", len(videos))
 
-    TODO:
-    1. Call get_playlist_videos(playlist_url) to get [{"video_id", "title"}, ...].
-    2. For each video: call fetch_transcript(video_id). If it returns None (no
-       captions — see the edge case handled above), skip it and keep going, don't crash.
-    3. Otherwise, call chunk_transcript(entries, window_seconds=window_seconds,
-       overlap_seconds=overlap_seconds or config.CHUNK_OVERLAP_SECONDS) and turn
-       each chunk into a record:
-           {
-               "video_id": video_id,
-               "title": title,
-               "text": chunk["text"],
-               "start_seconds": chunk["start_seconds"],
-               "youtube_url": f"https://www.youtube.com/watch?v={video_id}",
-           }
-    4. Collect all records across all videos into one list.
-    5. Write that list as JSON to `output_path` (create parent dirs if needed).
-    6. Log a summary: how many chunks, from how many videos, how many skipped.
-    """
-    raise NotImplementedError("TODO: implement build_transcripts_json")
+    overlap_seconds = config.CHUNK_OVERLAP_SECONDS if overlap_seconds is None else overlap_seconds
+    all_chunks = []
+    indexed_count = 0
+    skipped_count = 0
+
+    for video in videos:
+        video_id = video["video_id"]
+        title = video["title"]
+        entries = fetch_transcript(video_id)
+        if not entries:
+            skipped_count += 1
+            continue
+
+        chunks = chunk_transcript(entries, window_seconds=window_seconds, overlap_seconds=overlap_seconds)
+        for chunk in chunks:
+            all_chunks.append(
+                {
+                    "video_id": video_id,
+                    "title": title,
+                    "text": chunk["text"],
+                    "start_seconds": chunk["start_seconds"],
+                    "youtube_url": f"https://www.youtube.com/watch?v={video_id}",
+                }
+            )
+        indexed_count += 1
+        logger.info("Chunked %s (%s) into %d chunks", video_id, title, len(chunks))
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(all_chunks, indent=2))
+    logger.info(
+        "Wrote %d chunks from %d videos to %s (%d skipped: no captions)",
+        len(all_chunks),
+        indexed_count,
+        output_path,
+        skipped_count,
+    )
 
 
 def main():
